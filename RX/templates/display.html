@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Display Response</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+<h2>Selected Response</h2>
+
+<div id="content">Waiting for selection...</div>
+
+<script>
+const socket = io();
+
+socket.on("new_selection", function(data) {
+    document.getElementById("content").innerHTML = `
+        <p><strong>Name:</strong> ${data.name}</p>
+        <p><strong>Wish:</strong> ${data.wish}</p>
+        <p><strong>Achievement:</strong> ${data.achieve}</p>
+    `;
+});
+</script>
+
+</body>
+</html>

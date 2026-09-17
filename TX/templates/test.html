@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Message Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+        button { padding: 10px 16px; font-size: 16px; margin-top: 20px; }
+        #status { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h2>Generate Test Messages</h2>
+
+<p>This page creates random test entries with 2–3 word descriptions.</p>
+
+<label>ID Number</label>
+<input type="number" id="id" placeholder="Enter ID or leave blank for random">
+
+<label>First Name</label>
+<input type="text" id="first_name" placeholder="Enter name or leave blank for random">
+
+<button onclick="generateTest()">Generate & Send Test Message</button>
+
+<div id="status"></div>
+
+<script>
+function randomWord() {
+    const words = [
+        "snow","reindeer","holiday","bright","winter","cookie","magic",
+        "joy","storm","radio","signal","mesh","tree","gift","north",
+        "lights","scout","skywarn","weather","calm","wind","cloud"
+    ];
+    let count = Math.floor(Math.random() * 2) + 2; // 2–3 words
+    let result = [];
+    for (let i = 0; i < count; i++) {
+        result.push(words[Math.floor(Math.random() * words.length)]);
+    }
+    return result.join(" ");
+}
+
+async function generateTest() {
+    const id = document.getElementById("id").value || Math.floor(Math.random() * 9000 + 1000);
+    const first_name = document.getElementById("first_name").value || "TestUser";
+
+    const payload = {
+        id: id,
+        first_name: first_name,
+        christmas_wish: randomWord(),
+        achievement: randomWord()
+    };
+
+    const statusDiv = document.getElementById("status");
+    statusDiv.textContent = "Sending test message...";
+
+    try {
+        const response = await fetch("/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            statusDiv.textContent = "Test message transmitted.";
+            statusDiv.style.color = "green";
+        } else {
+            statusDiv.textContent = "Error: " + result.error;
+            statusDiv.style.color = "red";
+        }
+    } catch (err) {
+        statusDiv.textContent = "Network error: " + err;
+        statusDiv.style.color = "red";
+    }
+}
+</script>
+
+</body>
+</html>

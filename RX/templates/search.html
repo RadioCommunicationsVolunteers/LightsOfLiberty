@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Responses</title>
+</head>
+<body>
+<h2>Search Responses</h2>
+
+<form id="searchForm">
+    <input type="text" id="query" placeholder="Enter ID or First Name">
+    <button type="submit">Search</button>
+</form>
+
+<div id="results"></div>
+
+<script>
+document.getElementById("searchForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const query = document.getElementById("query").value;
+
+    const res = await fetch("/search", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: "query=" + encodeURIComponent(query)
+    });
+
+    const data = await res.json();
+
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.innerHTML = "";
+
+    data.forEach(item => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <p><strong>${item.name}</strong> — ${item.wish}</p>
+            <button onclick="selectResponse('${item._id}')">Select</button>
+        `;
+        resultsDiv.appendChild(div);
+    });
+});
+
+async function selectResponse(id) {
+    await fetch("/select", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({id})
+    });
+
+    alert("Response sent to display page.");
+}
+</script>
+
+</body>
+</html>

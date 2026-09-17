@@ -1,0 +1,99 @@
+
+<!-- Replace http://YOUR_PI_IP:8080/submit with Raspberry Pi address -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Christmas Message Submission</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        label {
+            font-weight: bold;
+            margin-top: 12px;
+            display: block;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 16px;
+            font-size: 16px;
+        }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Christmas Message Submission</h2>
+
+<form id="christmasForm">
+    <label for="id">ID Number</label>
+    <input type="number" id="id" required>
+
+    <label for="first_name">First Name</label>
+    <input type="text" id="first_name" required>
+
+    <label for="christmas_wish">Christmas Wish</label>
+    <textarea id="christmas_wish" rows="3" required></textarea>
+
+    <label for="achievement">Achievement / Memorable Moment</label>
+    <textarea id="achievement" rows="3" required></textarea>
+
+    <button type="submit">Send Message</button>
+</form>
+
+<div id="status"></div>
+
+<script>
+document.getElementById("christmasForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const payload = {
+        id: document.getElementById("id").value,
+        first_name: document.getElementById("first_name").value,
+        christmas_wish: document.getElementById("christmas_wish").value,
+        achievement: document.getElementById("achievement").value
+    };
+
+    const statusDiv = document.getElementById("status");
+    statusDiv.textContent = "Sending...";
+
+    try {
+        const response = await fetch("http://YOUR_PI_IP:8080/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            statusDiv.textContent = "Message transmitted successfully.";
+            statusDiv.style.color = "green";
+        } else {
+            statusDiv.textContent = "Error: " + result.error;
+            statusDiv.style.color = "red";
+        }
+    } catch (err) {
+        statusDiv.textContent = "Network error: " + err;
+        statusDiv.style.color = "red";
+    }
+});
+</script>
+
+</body>
+</html>

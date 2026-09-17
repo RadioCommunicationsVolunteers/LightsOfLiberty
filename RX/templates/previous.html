@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Previous Responses</title>
+</head>
+<body>
+<h2>Previously Selected Responses</h2>
+
+<div id="list"></div>
+
+<script>
+async function loadList() {
+    const res = await fetch("/previous/list");
+    const data = await res.json();
+
+    const listDiv = document.getElementById("list");
+    listDiv.innerHTML = "";
+
+    data.forEach(item => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <p><strong>${item.name}</strong> — ${item.wish}</p>
+            <button onclick="deselect('${item._id}')">Deselect</button>
+        `;
+        listDiv.appendChild(div);
+    });
+}
+
+async function deselect(id) {
+    await fetch("/previous/deselect", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({id})
+    });
+
+    loadList();
+}
+
+loadList();
+</script>
+
+</body>
+</html>
