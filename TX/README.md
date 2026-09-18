@@ -27,18 +27,22 @@ This is for the transmitter portion of this system and is designed for
 
 Baud Rate: **115200** (Meshtastic default)
 
-Enable UART on Raspberry Pi:
+## Enable UART on Raspberry Pi:
 
 ``` Bash
 sudo raspi-config
 # Interface Options → Serial → Disable login shell, enable serial port hardware
 ```
 
-Install Flask using Python Install Package Manager
+## Install Flask using Python Install Package Manager
 
 ``` Bash
 pip install flask pyserial
 ```
+
+## Install Meshtastic API Python Library
+
+To Install Meshtastic API, please visit the Meshtastic Python CLI Installation: for [Linux](https://meshtastic.org/docs/software/python/cli/installation/?install-python-cli=linux) | [macOS](https://meshtastic.org/docs/software/python/cli/installation/?install-python-cli=macos) | [Windows](https://meshtastic.org/docs/software/python/cli/installation/?install-python-cli=windows) | [Termux for Android](https://meshtastic.org/docs/software/python/cli/installation/?install-python-cli=termux).
 
 ## Example POST Request
 
