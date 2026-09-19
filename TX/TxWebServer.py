@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify
 import serial
 import time
 import random
+import meshtastic
+import meshtastic.serial_interface
 
 WORDS = [
     "snow", "reindeer", "holiday", "bright", "winter", "cookie", "magic",
@@ -12,13 +14,14 @@ WORDS = [
 def random_phrase():
     return " ".join(random.sample(WORDS, random.randint(2, 3)))
 
-# -----------------------------
-# UART Setup
-# -----------------------------
-UART_PORT = "/dev/serial0"   # Raspberry Pi UART
-BAUD_RATE = 115200
+# By default will try to find a meshtastic device,
+# otherwise provide a device path like /dev/ttyUSB0
+interface = meshtastic.serial_interface.SerialInterface()
+# or something like this
+# interface = meshtastic.serial_interface.SerialInterface(devPath='/dev/cu.usbmodem53230050571')
 
-ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=1)
+# or sendData to send binary data, see documentations for other options.
+
 
 # -----------------------------
 # Flask Setup
@@ -38,12 +41,11 @@ def build_message_frame(id_num, first_name, christmas_wish, achievement):
         "END\n"
     )
 
-def send_to_heltec(message):
+def sendMessage(message):
     """
-    Send the message over UART to the Heltec V4.
+    Send the message over UART to the Meshtastic device.
     """
-    ser.write(message.encode("utf-8"))
-    ser.flush()
+    interface.sendText(message)
     time.sleep(0.1)
 
 @app.route("/submit", methods=["POST"])
@@ -66,7 +68,7 @@ def submit():
     message = build_message_frame(id_num, first_name, christmas_wish, achievement)
 
     # Send over UART
-    send_to_heltec(message)
+    sendMessage(message)
 
     return jsonify({"status": "Message transmitted"}), 200
 
