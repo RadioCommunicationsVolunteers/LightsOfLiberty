@@ -1,14 +1,17 @@
 from flask import Flask, render_template, request, jsonify
-import serial
+import logging
 import time
 import random
 import meshtastic
 import meshtastic.serial_interface
 
+LOG_LEVEL = logging.DEBUG  # Set to logging.INFO or logging.ERROR to reduce output
+CHANNEL_INDEX = 1  # Use the index configured on your Meshtastic device
 WORDS = [
     "snow", "reindeer", "holiday", "bright", "winter", "cookie", "magic",
-    "joy", "storm", "radio", "signal", "mesh", "tree", "gift", "north",
-    "lights", "scout", "skywarn", "weather", "calm", "wind", "cloud"
+    "joy", "radio", "signal", "ornament", "tree", "gift", "north", "pole",
+    "sleigh", "bells", "frost", "candle", "star", "lights", "candycane", 
+    "snowflake", "calm"
 ]
 
 def random_phrase():
@@ -21,7 +24,6 @@ interface = meshtastic.serial_interface.SerialInterface()
 # interface = meshtastic.serial_interface.SerialInterface(devPath='/dev/cu.usbmodem53230050571')
 
 # or sendData to send binary data, see documentations for other options.
-
 
 # -----------------------------
 # Flask Setup
@@ -45,8 +47,18 @@ def sendMessage(message):
     """
     Send the message over UART to the Meshtastic device.
     """
-    interface.sendText(message)
-    time.sleep(0.1)
+    
+    app.logger.debug(f"""Sending message: 
+        port: {interface.devPath} 
+        name: {interface.getLongName()}({interface.getShortName()}) 
+        channel {CHANNEL_INDEX}
+        message content: 
+        
+    ------------------------------
+    {message}
+    ------------------------------""")
+    interface.sendText(message, channelIndex=CHANNEL_INDEX)
+    time.sleep(0.5)
 
 @app.route("/submit", methods=["POST"])
 def submit():
@@ -76,5 +88,15 @@ def submit():
 def test_page():
     return render_template("test.html")
 
+@app.route("/")
+def index():
+    return render_template("index.html")
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    
+    # Set up logging
+    app.logger.setLevel(LOG_LEVEL)
+    
+    # SerialInterface owns an exclusive device handle; the debug reloader can
+    # import this module in multiple processes and contend for the same port.
+    app.run(host="0.0.0.0", port=8080, debug=True, use_reloader=False)

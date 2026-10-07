@@ -180,10 +180,10 @@ class MeshtasticQRApp(App):
             yield MaskedLabel(text=b64_key)
         yield Footer()
 
-if __name__ == "__main__":
-    app = MeshtasticQRApp()
-    app.run()
+# if __name__ == "__main__":
+    # app = MeshtasticQRApp()
+    # app.run()
     
 # # Generate and print the key
-# key = generate_meshtastic_key()
-# print(f"Your Meshtastic channel key:\n{key}")
+key = generate_meshtastic_key()
+print(f"Your Meshtastic channel key:\n{key}")

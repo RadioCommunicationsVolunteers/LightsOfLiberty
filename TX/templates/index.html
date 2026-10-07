@@ -1,0 +1,243 @@
+
+<!-- Replace http://YOUR_PI_IP:8080/submit with Raspberry Pi address -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Christmas Message Submission</title>
+    <style>
+        :root {
+            --airmail-red: #d32f2f;
+            --airmail-blue: #1976d2;
+        }
+
+        /* 3D Stage Setup */
+        .envelope-wrapper {
+            position: relative;
+            width: min(760px, calc(100vw - 32px));
+            height: 520px;
+            margin: 50px auto;
+            perspective: 1000px;
+        }
+
+        /* The Envelope Base Layer */
+        .envelope {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            aspect-ratio: 3 / 2;
+            background: #f4f4f4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        /* Airmail Border on Front pocket */
+        .envelope-front {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            box-sizing: border-box;
+            background: #fdfdfd;
+            border: 12px solid transparent;
+            border-image: repeating-linear-gradient(
+                135deg,
+                var(--airmail-red) 0px, var(--airmail-red) 12px,
+                #fff 12px, #fff 24px,
+                var(--airmail-blue) 24px, var(--airmail-blue) 36px,
+                #fff 36px, #fff 48px
+            ) 24;
+            /* Cutout effect to see the form slide in */
+            clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+        }
+
+        /* Interior Back of Envelope */
+        .envelope-back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #e0e0e0;
+            z-index: 1;
+        }
+
+        /* The Folding Flap */
+        .flap-top {
+            position: absolute;
+            top: -60px;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: #f4f4f4;
+            z-index: 1;
+            transform-origin: bottom;
+            transform: rotateX(0deg);
+            transition: transform 0.4s ease-in-out 0.6s, z-index 0s linear 0.6s;
+            /* Creates a triangular envelope flap shape */
+            clip-path: polygon(0% 100%, 50% 0%, 100% 100%);
+        }
+
+        /* The Form Paper */
+        .envelope-form {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 50%;
+            box-sizing: border-box;
+            margin: 0;
+            max-width: none;
+            padding: 20px;
+            background: #ffffff;
+            
+            /* Added Border Styles */
+            border: 1px solid #111111;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.06);
+            
+            z-index: 3;
+            transform-origin: top center;
+            transform: translateX(-50%);
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), z-index 0s linear 0.6s;
+        }
+
+        .envelope-form input, 
+        .envelope-form textarea, 
+        .envelope-form button {
+            width: 100%;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        form {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 12px;
+            display: block;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 16px;
+            font-size: 16px;
+        }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        /* --- ANIMATION STATES --- */
+
+        /* Step 1: Slide form down into the pocket and drop its layer hierarchy */
+        .envelope-wrapper.submitted .envelope-form {
+            transform: translate(-50%, 20px) scale(0.82);
+            z-index: 1;
+        }
+
+        /* Step 2. Flap swings shut after form finishes dropping */
+        .envelope-wrapper.submitted .flap-top {
+            transform: rotateX(-180deg);
+            z-index: 4;
+        }
+
+        /* 3. Optional: Whole envelope flies away offscreen */
+        .envelope-wrapper.submitted {
+            animation: flyAway 0.8s ease-in-out 1.2s forwards;
+        }
+
+        @keyframes flyAway {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            30% { transform: translateY(20px) scale(1); }
+            100% { transform: translateY(-900px) rotate(5deg) scale(0.8); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="envelope-wrapper">
+    <!-- The Envelope Body -->
+    <div class="envelope">
+        <div class="flap-top"></div>
+        <div class="envelope-back"></div>
+        <div class="envelope-front"></div>
+    </div>
+
+    <form id="mailForm" class="envelope-form" onsubmit="sendMail(event)">
+        <h2>Christmas Message Submission</h2>
+        <label for="id">ID Number</label>
+        <input type="number" id="id" required>
+
+        <label for="first_name">First Name</label>
+        <input type="text" id="first_name" required>
+
+        <label for="christmas_wish">Christmas Wish</label>
+        <textarea id="christmas_wish" rows="3" required></textarea>
+
+        <label for="achievement">Achievement / Memorable Moment</label>
+        <textarea id="achievement" rows="3" required></textarea>
+
+        <button type="submit">Send Message</button>
+    </form>
+</div>
+
+<div id="status"></div>
+
+<script>
+async function sendMail(event) {
+    event.preventDefault();
+
+    const payload = {
+        id: document.getElementById("id").value,
+        first_name: document.getElementById("first_name").value,
+        christmas_wish: document.getElementById("christmas_wish").value,
+        achievement: document.getElementById("achievement").value
+    };
+
+    const statusDiv = document.getElementById("status");
+    statusDiv.textContent = "Sending...";
+
+    try {
+        const response = await fetch("/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            const wrapper = document.querySelector('.envelope-wrapper');
+            wrapper.classList.add('submitted');
+
+            // Optional: Handle data processing or page redirect after animation ends
+            setTimeout(() => {
+                statusDiv.textContent = "Message transmitted successfully.";
+                statusDiv.style.color = "green";
+                // document.getElementById('mailForm').submit(); // Uncomment to send data
+            }, 2000); 
+        } else {
+            statusDiv.textContent = "Error: " + result.error;
+            statusDiv.style.color = "red";
+        }
+    } catch (err) {
+        statusDiv.textContent = "Network error: " + err;
+        statusDiv.style.color = "red";
+    }
+};
+</script>
+
+</body>
+</html>

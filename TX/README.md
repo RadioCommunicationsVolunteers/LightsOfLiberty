@@ -34,6 +34,12 @@ sudo raspi-config
 # Interface Options → Serial → Disable login shell, enable serial port hardware
 ```
 
+On Windows, close other applications that may have COM5 open (such as Meshtastic,
+Arduino Serial Monitor, or another copy of this server) before starting the server.
+Serial ports are exclusive, so only one process can use the device at a time. The
+Flask debug reloader is disabled in `TxWebServer.py` to avoid opening the serial
+interface more than once.
+
 Install Flask using Python Install Package Manager
 
 ``` Bash
