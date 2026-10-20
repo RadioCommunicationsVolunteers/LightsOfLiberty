@@ -7,23 +7,12 @@ import meshtastic.serial_interface
 
 LOG_LEVEL = logging.DEBUG  # Set to logging.INFO or logging.ERROR to reduce output
 CHANNEL_INDEX = 1  # Use the index configured on your Meshtastic device
-WORDS = [
-    "snow", "reindeer", "holiday", "bright", "winter", "cookie", "magic",
-    "joy", "radio", "signal", "ornament", "tree", "gift", "north", "pole",
-    "sleigh", "bells", "frost", "candle", "star", "lights", "candycane", 
-    "snowflake", "calm"
-]
 
-def random_phrase():
-    return " ".join(random.sample(WORDS, random.randint(2, 3)))
-
-# By default will try to find a meshtastic device,
+# By default serialinterface() will try to find a meshtastic device,
 # otherwise provide a device path like /dev/ttyUSB0
-interface = meshtastic.serial_interface.SerialInterface()
-# or something like this
+# or something like this:
 # interface = meshtastic.serial_interface.SerialInterface(devPath='/dev/cu.usbmodem53230050571')
-
-# or sendData to send binary data, see documentations for other options.
+interface = meshtastic.serial_interface.SerialInterface()
 
 # -----------------------------
 # Flask Setup
