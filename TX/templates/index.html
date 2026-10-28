@@ -11,6 +11,44 @@
             --airmail-blue: #1976d2;
         }
 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            text-align: center;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        .badge {
+            display: inline-block;
+            padding: 12px 30px;
+            border-radius: 50px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+        .connected { background-color: #2ec4b6; }
+        .disconnected { background-color: #e71d36; }
+        .error { background-color: #ff9f1c; }
+        
+        .details {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button:hover { background-color: #0b253c; }
+
         /* 3D Stage Setup */
         .envelope-wrapper {
             position: relative;
@@ -130,9 +168,16 @@
             box-sizing: border-box;
         }
         button {
-            margin-top: 20px;
             padding: 10px 16px;
             font-size: 16px;
+            background-color: #011627;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
         }
         #status {
             margin-top: 20px;
@@ -157,6 +202,14 @@
         .envelope-wrapper.submitted {
             animation: flyAway 0.8s ease-in-out 1.2s forwards;
         }
+        .pulse {
+            animation: pulse-animation 2s infinite;
+        }
+        @keyframes pulse-animation {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
 
         @keyframes flyAway {
             0% { transform: translateY(0) scale(1); opacity: 1; }
@@ -166,78 +219,139 @@
     </style>
 </head>
 <body>
+    <div class="container">
+        <h1>Meshtastic Node Status</h1>
+        
+        <!-- The UI states will be entirely handled dynamically via JS now -->
+        <div id="status-badge" class="badge disconnected pulse">
+            Checking...
+        </div>
 
-<div class="envelope-wrapper">
-    <!-- The Envelope Body -->
-    <div class="envelope">
-        <div class="flap-top"></div>
-        <div class="envelope-back"></div>
-        <div class="envelope-front"></div>
+        <div id="status-details" class="details">
+            <p>Loading telemetry data...</p>
+        </div>
     </div>
 
-    <form id="mailForm" class="envelope-form" onsubmit="sendMail(event)">
-        <h2>Christmas Message Submission</h2>
-        <label for="id">ID Number</label>
-        <input type="number" id="id" required>
+    <script>
+        async function checkStatus() {
+            try {
+                // Fetch live status from our Flask JSON endpoint
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                const badge = document.getElementById('status-badge');
+                const details = document.getElementById('status-details');
+                
+                // 1. Reset and Update Badge Styling/Text
+                badge.className = `badge ${data.status}`;
+                badge.textContent = data.status;
+                
+                // Add a gentle pulse animation if the node drops offline to draw attention
+                // if (data.status !== 'connected') {
+                //     badge.classList.add('pulse');
+                // }
 
-        <label for="first_name">First Name</label>
-        <input type="text" id="first_name" required>
+                // 2. Dynamically build the descriptive text inside the card
+                try {
+                    details.replaceChildren();
+                    Object.entries(data).forEach(([key, value]) => {
+                        if (key === 'status') {
+                            return;
+                        }
 
-        <label for="christmas_wish">Christmas Wish</label>
-        <textarea id="christmas_wish" rows="3" required></textarea>
-
-        <label for="achievement">Achievement / Memorable Moment</label>
-        <textarea id="achievement" rows="3" required></textarea>
-
-        <button type="submit">Send Message</button>
-    </form>
-</div>
-
-<div id="status"></div>
-
-<script>
-async function sendMail(event) {
-    event.preventDefault();
-
-    const payload = {
-        id: document.getElementById("id").value,
-        first_name: document.getElementById("first_name").value,
-        christmas_wish: document.getElementById("christmas_wish").value,
-        achievement: document.getElementById("achievement").value
-    };
-
-    const statusDiv = document.getElementById("status");
-    statusDiv.textContent = "Sending...";
-
-    try {
-        const response = await fetch("/submit", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            const wrapper = document.querySelector('.envelope-wrapper');
-            wrapper.classList.add('submitted');
-
-            // Optional: Handle data processing or page redirect after animation ends
-            setTimeout(() => {
-                statusDiv.textContent = "Message transmitted successfully.";
-                statusDiv.style.color = "green";
-                // document.getElementById('mailForm').submit(); // Uncomment to send data
-            }, 2000); 
-        } else {
-            statusDiv.textContent = "Error: " + result.error;
-            statusDiv.style.color = "red";
+                        const p = document.createElement('p');
+                        p.innerHTML = `<strong>${key}:</strong> ${value}`;
+                        details.appendChild(p);
+                    });
+                } catch (error) {
+                    console.error("Error while updating status details:", error.message);
+                }
+            } catch (error) {
+                console.error("Failed to fetch node status:", error);
+                document.getElementById('status-badge').className = "badge error";
+                document.getElementById('status-badge').textContent = "Web Error";
+                document.getElementById('status-details').innerHTML = `<p style="text-align:center;">Lost connection to the Flask server.</p>`;
+            }
         }
-    } catch (err) {
-        statusDiv.textContent = "Network error: " + err;
-        statusDiv.style.color = "red";
-    }
-};
-</script>
+
+        // Run immediately when the page loads
+        checkStatus();
+
+        // Check for updates automatically every 3 seconds (3000 ms)
+        setInterval(checkStatus, 3000);
+    </script>
+
+    <div class="envelope-wrapper">
+        <!-- The Envelope Body -->
+        <div class="envelope">
+            <div class="flap-top"></div>
+            <div class="envelope-back"></div>
+            <div class="envelope-front"></div>
+        </div>
+
+        <form id="mailForm" class="envelope-form" onsubmit="sendMail(event)">
+            <h2>Christmas Message Submission</h2>
+            <label for="id">ID Number</label>
+            <input type="number" id="id" required>
+
+            <label for="first_name">First Name</label>
+            <input type="text" id="first_name" required>
+
+            <label for="christmas_wish">Christmas Wish</label>
+            <textarea id="christmas_wish" rows="3" required></textarea>
+
+            <label for="achievement">Achievement / Memorable Moment</label>
+            <textarea id="achievement" rows="3" required></textarea>
+
+            <button type="submit">Send Message</button>
+        </form>
+    </div>
+
+    <div id="msgstatus"></div>
+
+    <script>
+        async function sendMail(event) {
+            event.preventDefault();
+
+            const payload = {
+                id: document.getElementById("id").value,
+                first_name: document.getElementById("first_name").value,
+                christmas_wish: document.getElementById("christmas_wish").value,
+                achievement: document.getElementById("achievement").value
+            };
+
+            const statusDiv = document.getElementById("msgstatus");
+            statusDiv.textContent = "Sending...";
+
+            try {
+                const response = await fetch("/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const wrapper = document.querySelector('.envelope-wrapper');
+                    wrapper.classList.add('submitted');
+
+                    // Optional: Handle data processing or page redirect after animation ends
+                    setTimeout(() => {
+                        statusDiv.textContent = "Message transmitted successfully.";
+                        statusDiv.style.color = "green";
+                        // document.getElementById('mailForm').submit(); // Uncomment to send data
+                    }, 2000); 
+                } else {
+                    statusDiv.textContent = "Error: " + result.error;
+                    statusDiv.style.color = "red";
+                }
+            } catch (err) {
+                statusDiv.textContent = "Network error: " + err;
+                statusDiv.style.color = "red";
+            }
+        };
+    </script>
 
 </body>
 </html>
