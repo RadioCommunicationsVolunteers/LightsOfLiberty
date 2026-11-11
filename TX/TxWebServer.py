@@ -6,118 +6,58 @@ import meshtastic
 import meshtastic.serial_interface
 import meshtastic.tcp_interface
 from meshtastic.mesh_interface import MeshInterface
+from meshtastic.serial_interface import SerialInterface
+from meshtastic.tcp_interface import TCPInterface
 from meshtastic.node import Node
 from pubsub import pub
 
 LOG_LEVEL = logging.DEBUG  # Set to logging.INFO or logging.ERROR to reduce output
-CHANNEL_ID = 1  # Use the index configured on your Meshtastic device
+rx_node_short_name = "LoLB"  # Set this to the short name of the receiving node you want to send messages to
 
 was_connected = False
 reconnect_attempts = 0
 max_reconnect_attempts = 3
 
-def get_serial_interface(devPath: Optional[str] = None, 
-                         debugOut = None, 
-                         noProto: bool = False, 
-                         connectNow: bool = True, 
-                         noNodes: bool = False, 
-                         timeout: int = 30):
-    try:
-        interface = meshtastic.serial_interface.SerialInterface(devPath, debugOut, noProto, connectNow, noNodes, timeout)
-        return interface
-    except Exception as e:
-        print(f"Error connecting to device: {e}")
-        exit(1)
+def initialize_interface(use_tcp: bool = False, use_custom_device: bool = False, meshtastic_ip: Optional[str] = None, custom_device_path: Optional[str] = None) -> MeshInterface:
+    if use_tcp:
+        if not meshtastic_ip:
+            raise ValueError("Meshtastic IP must be provided when using TCP.")
+        iface = TCPInterface(meshtastic_ip)
+    elif use_custom_device:
+        if not custom_device_path:
+            raise ValueError("Custom device path must be provided when using a custom device.")
+        iface = SerialInterface(custom_device_path)
+    else:
+        iface = SerialInterface()
+        # By default serialinterface() will try to find a meshtastic device,
 
-def get_tcp_interface(hostname: str = "192.168.X.X",
-                      debugOut = None,
-                      noProto: bool = False,
-                      connectNow: bool = True,
-                      portNumber: int = meshtastic.tcp_interface.DEFAULT_TCP_PORT,
-                      noNodes: bool = False,
-                      timeout: int = 300):
-    # For TCP/Wi-Fi use: from meshtastic.tcp_interface import TCPInterface; interface = TCPInterface(hostname="192.168.X.X")
-    try:
-        interface = meshtastic.tcp_interface.TCPInterface(hostname, debugOut, noProto, connectNow, portNumber, noNodes, timeout)
-        return interface
-    except Exception as e:
-        print(f"Error connecting to device: {e}")
-        exit(1)
-
-def initialize_interface(use_tcp: bool = False, use_custom_device: bool = False, meshtastic_ip: Optional[str] = None, custom_device_path: Optional[str] = None) -> meshtastic.interface.Interface:
-    try:
-        if use_tcp:
-            interface = get_tcp_interface(meshtastic_ip, debugOut=None, noProto=False, connectNow=True, noNodes=False, timeout=300)
-        elif use_custom_device:
-            interface = get_serial_interface(custom_device_path, debugOut=None, noProto=False, connectNow=True, noNodes=False, timeout=300)
-        else:
-            interface = get_serial_interface(debugOut=None, noProto=False, connectNow=True, noNodes=False, timeout=300)
-            # By default serialinterface() will try to find a meshtastic device,
-
-        pub.subscribe(on_connection_established, "meshtastic.connection.established")
-        pub.subscribe(on_connection_loss, "meshtastic.connection.lost")
-        return interface
-    except Exception as e:
-        print(f"Error initializing interface: {e}")
-        return None   
-
-def enable_want_ack(iface: MeshInterface, channel_id: int = CHANNEL_ID):
-    try:
-        # Connect to the Meshtastic device
-        if iface is None:
-            print("Error: Interface is not initialized.")
-            return
-
-        node: Node = iface.getNode()
-
-
-        # Get current channel settings
-        channels = node.channels
-        if channel_id >= len(channels):
-            print(f"Error: Channel index {channel_id} out of range.")
-            return
-
-        # Modify the channel settings
-        channel = channels[channel_id]
-        print(f"Current channel settings: {channel}")
-
-        if channel.settings.encryptionKey is None:
-            print("Warning: Channel has no encryption key set. Enabling wantAck may not be effective.")
-        else:
-            # Enable wantAck
-            channel.settings.wantAck = True
-            channel.settings.wantResponse = True
-            channel.settings.responseTimeout = 300
-            channel.settings.responseMaxRetries = 3
-            channel.settings.responseRetryInterval = 10
-            channel.settings.ackTimeout = 300
-            channel.settings.ackMaxRetries = 3
-            channel.settings.ackRetryInterval = 10
-
-            # Push updated settings to the device
-            interface.setChannel(channel_index, channel.settings)
-
-            print(f"✅ wantAck enabled on channel {channel_index}")
-
-    except Exception as e:
-        print(f"Error configuring channel: {e}")
-        exit(1)
+    pub.subscribe(on_connection_established, "meshtastic.connection.established")
+    pub.subscribe(on_connection_loss, "meshtastic.connection.lost")
+    return iface
 
 # 2. Define the callback function to handle new packets
-def on_connection_established(interface: meshtastic.interface.Interface):
+def on_connection_established(iface: MeshInterface):
     global was_connected
     was_connected = True
     global reconnect_attempts
     if reconnect_attempts > 0:
         print(f"Reconnected after {reconnect_attempts} attempts.")
     else:
+        # Get the node ID of the receiving node by its short name
+        global rx_node_id
+        rx_node_info = get_node_by_short_name(iface, rx_node_short_name)
+        if rx_node_info is None:
+            app.logger.error(f"Receiving node with short name '{rx_node_short_name}' not found.")
+            exit(1)
+        rx_node_id = rx_node_info["nodeNum"]
+        app.logger.debug(f"Receiving node ID for '{rx_node_short_name}': {rx_node_id}")
         print("Connection established with the device.")
     reconnect_attempts = 0
 
-def on_connection_loss(interface: meshtastic.interface.Interface):
+def on_connection_loss(iface: MeshInterface):
     print("Connection lost with the device.")
-    if interface:
-        interface.close()
+    if iface:
+        iface.close()
     time.sleep(10)
     print("Retrying connection...")
     global reconnect_attempts
@@ -126,30 +66,41 @@ def on_connection_loss(interface: meshtastic.interface.Interface):
         print(f"Maximum reconnect attempts of {max_reconnect_attempts} reached.")
         exit(1)
     
-    interface = initialize_interface(use_tcp=USE_TCP, use_custom_device=USE_CUSTOM_DEVICE, meshtastic_ip=meshtastic_ip, custom_device_path=custom_device_path)
+    iface = initialize_interface(use_tcp=USE_TCP, use_custom_device=USE_CUSTOM_DEVICE, meshtastic_ip=meshtastic_ip, custom_device_path=custom_device_path)
 
-def get_connection_status(interface: meshtastic.interface.Interface):
+def get_connection_status(iface: MeshInterface):
     """Safely checks the status of the global meshtastic interface."""
-    if interface is None:
+    if iface is None:
         return {"status": "disconnected", "reason": "Interface failed to initialize"}
     
     # check if underlying stream/protocol layer is dead or not initialized
-    if getattr(interface, "noProto", True):
+    if getattr(iface, "noProto", True):
         return {"status": "disconnected", "reason": "No protocol stream or link down"}
     
-    if not interface.isConnected:
+    if not iface.isConnected:
         return {"status": "disconnected", "reason": "Interface not connected"}
     
     try:
         # If we can safely pull local node info, the connection is alive and healthy        
         return {
             "status": "connected",
-            "short_name": interface.getShortName(),
-            "long_name": interface.getLongName(),
-            "channel": CHANNEL_ID
+            "short_name": iface.getShortName(),
+            "long_name": iface.getLongName(),
+            "node_id": iface.localNode.nodeNum
         }
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+    
+def get_node_by_short_name(iface: MeshInterface, short_name: str):
+  if not iface.nodes:
+      return None
+  
+  nodes: dict[str, dict[str, meshtastic.Any]] = iface.nodes or {}    
+  for node_id, node_info in nodes.items():
+    user: dict[str, meshtastic.Any] = node_info.get("user", {})
+    if user and user.get("shortName") == short_name:
+      return node_info
+  return None
     
 def build_message_frame(id_num, first_name, christmas_wish, achievement):
     """
@@ -165,36 +116,35 @@ def build_message_frame(id_num, first_name, christmas_wish, achievement):
         "END\n"
     )
 
-def sendMessage(interface: meshtastic.interface.Interface, message: str, want_Ack: bool = False):
+def sendMessage(iface: MeshInterface, node_id: str, message: str, want_Ack: bool = False):
     """
     Send the message over UART to the Meshtastic device.
     """
-    if isinstance(interface, meshtastic.tcp_interface.TCPInterface):
-        port = interface.portNumber
-    elif isinstance(interface, meshtastic.serial_interface.SerialInterface):
-        port = interface.devPath
+    if isinstance(iface, TCPInterface):
+        port = iface.portNumber
+    elif isinstance(iface, SerialInterface):
+        port = iface.devPath
     else:
         port = "unknown"
     
-    if interface is None:
+    if iface is None:
         app.logger.error("Interface is not initialized.")
         return False
     
     app.logger.debug(f"""Sending message: 
         port: {port}
-        name: {interface.getLongName()}({interface.getShortName()}) 
-        channel {CHANNEL_ID}
+        name: {iface.getLongName()}({iface.getShortName()}) 
+        node {node_id}
         message content: 
         
         ------------------------------
         {message}
         ------------------------------""")
-    acknowledgment = interface.sendText(message, wantAck=want_Ack, channelIndex=CHANNEL_ID)
+    meshPacket = iface.sendText(message, destinationId=node_id, wantAck=want_Ack)
     if not want_Ack:
         return True
-    elif acknowledgment:
-        success = interface.waitForAckNak()
-        return success
+    elif meshPacket:
+        return iface.waitForAckNak()
     return False
 
 # -----------------------------
@@ -211,8 +161,8 @@ custom_device_path = "/dev/ttyUSB0" #only used if USE_CUSTOM_DEVICE is True
 
 # --- GLOBAL INTERFACE INITIALIZATION ---
 # We initialize this globally so Flask doesn't attempt to reconnect on every HTTP request.
-interface = initialize_interface(use_tcp=USE_TCP, use_custom_device=USE_CUSTOM_DEVICE, meshtastic_ip=meshtastic_ip, custom_device_path=custom_device_path)
-if interface is None:
+iface = initialize_interface(use_tcp=USE_TCP, use_custom_device=USE_CUSTOM_DEVICE, meshtastic_ip=meshtastic_ip, custom_device_path=custom_device_path)
+if iface is None:
     app.logger.error("Failed to initialize the interface.")
     exit(1)            
 
@@ -243,7 +193,7 @@ def submit():
     while (not success) and (attempts < max_attempts):
         success = False
         try:
-            success = sendMessage(interface, message)
+            success = sendMessage(iface, rx_node_id, message)
             if success:
                 app.logger.debug(f"Message acknowledged by the device.")
             else:
@@ -264,8 +214,8 @@ def submit():
                 raise e
         finally:
             # Ensure the interface resource is properly closed
-            if ('interface' in locals()) and (interface is not None):
-                interface.close()
+            if ('interface' in locals()) and (iface is not None):
+                iface.close()
 
     if success:
         return jsonify({"status": "Message transmitted"}), 200
@@ -279,7 +229,7 @@ def test_page():
 @app.route('/api/status', methods=['GET'])
 def status_endpoint():
     """Returns the current connection status of the Meshtastic device in JSON format."""
-    return jsonify(get_connection_status())
+    return jsonify(get_connection_status(iface))
 
 @app.route("/")
 def index():
